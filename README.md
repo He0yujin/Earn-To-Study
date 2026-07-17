@@ -1,1 +1,1 @@
-# Earn-To-Study
+# [ERC-20] Earn-To-Study
