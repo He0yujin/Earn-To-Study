@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earn To Study | Web3 목표 달성 타이머</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Ethers.js (Web3 연동) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.11.1/ethers.umd.min.js"></script>
+    
+    <!-- SweetAlert2 (알림창) -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <div class="container glass-panel">
+        <header>
+            <div class="logo">
+                <h1>📚 Earn To Study</h1>
+                <p>목표를 달성하고 보상을 받으세요 (E2S)</p>
+            </div>
+            <button id="connectBtn" class="btn primary-btn">지갑 연결</button>
+        </header>
+
+        <main>
+            <div id="dashboard" class="dashboard hidden">
+                <div class="info-card">
+                    <h3>연결된 지갑</h3>
+                    <p id="walletAddress">-</p>
+                </div>
+                <div class="info-card">
+                    <h3>E2S 잔액</h3>
+                    <p id="walletBalance">0 E2S</p>
+                </div>
+                <!-- 데모용 테스트 토큰 받기 버튼 -->
+                <button id="mintTestBtn" class="btn secondary-btn small-btn">테스트 토큰 받기</button>
+            </div>
+
+            <div id="studySection" class="study-section hidden">
+                <div class="setup-area" id="setupArea">
+                    <h2>오늘의 목표 설정</h2>
+                    <div class="input-group">
+                        <label for="depositAmount">예치할 토큰 (E2S)</label>
+                        <input type="number" id="depositAmount" placeholder="예: 10" min="1">
+                    </div>
+                    <div class="input-group">
+                        <label for="studyDuration">목표 공부 시간 (초)</label>
+                        <input type="number" id="studyDuration" placeholder="데모용이므로 초 단위로 입력 (예: 10)" min="1">
+                    </div>
+                    <button id="startStudyBtn" class="btn action-btn">예치하고 공부 시작!</button>
+                </div>
+
+                <div class="timer-area hidden" id="timerArea">
+                    <h2>진행 중인 목표</h2>
+                    <div class="timer-display">
+                        <span id="timeRemaining">00:00</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p class="status-text" id="timerStatus">열심히 공부하는 중...</p>
+                    <button id="claimBtn" class="btn action-btn success-btn hidden">인증 완료 및 보상 수령</button>
+                </div>
+            </div>
+
+            <div class="loading-overlay hidden" id="loadingOverlay">
+                <div class="spinner"></div>
+                <p id="loadingText">트랜잭션 처리 중...</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- 로직 스크립트 -->
+    <script src="app.js"></script>
+</body>
+</html>
