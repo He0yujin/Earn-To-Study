@@ -46,6 +46,18 @@
                 <button id="mintTestBtn" class="btn secondary-btn small-btn">테스트 토큰 받기</button>
             </div>
 
+            <div id="groupSelectionArea" class="study-section hidden" style="margin-bottom: 20px;">
+                <h2>스터디 방 참가 / 생성</h2>
+                <div class="input-group">
+                    <label for="groupCode">방 코드 (예: STUDY123)</label>
+                    <input type="text" id="groupCode" placeholder="방 코드를 입력하세요">
+                </div>
+                <div class="action-buttons" style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button id="joinGroupBtn" class="btn action-btn success-btn" style="flex: 1;">기존 방 참가</button>
+                    <button id="createGroupBtn" class="btn action-btn primary-btn" style="flex: 1;">새 방 만들기</button>
+                </div>
+            </div>
+
             <div id="studySection" class="study-section hidden">
                 <div class="setup-area" id="setupArea">
                     <h2>오늘의 목표 설정</h2>
@@ -73,6 +85,23 @@
                         <button id="claimBtn" class="btn action-btn success-btn hidden" style="flex: 1;">인증 완료 및 보상 수령</button>
                         <button id="giveUpBtn" class="btn action-btn danger-btn hidden" style="flex: 1; background-color: var(--error-color);">공부 포기하기 (예치금 몰수)</button>
                     </div>
+                </div>
+
+                <div id="groupDashboard" class="info-card" style="margin-top: 20px;">
+                    <h3 style="margin-bottom: 15px;">👥 스터디 그룹 멤버 현황 <span id="currentGroupCode" style="font-size: 14px; color: var(--primary-color);"></span></h3>
+                    <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                <th style="padding: 10px 0;">멤버</th>
+                                <th style="padding: 10px 0;">예치금</th>
+                                <th style="padding: 10px 0;">목표 시간</th>
+                                <th style="padding: 10px 0;">상태</th>
+                            </tr>
+                        </thead>
+                        <tbody id="groupMembersBody">
+                            <tr><td colspan="4" style="text-align:center; padding:10px;">불러오는 중...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

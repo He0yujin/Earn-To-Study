@@ -1,7 +1,7 @@
 // ==========================================
 // 스마트 컨트랙트 설정
 // ==========================================
-const CONTRACT_ADDRESS = "0xC05047F5c717A676a32cc07EdE7E369ba3572566";
+const CONTRACT_ADDRESS = "0x13cCe855Ec24d7cA72175482f09C784ad7aA8F3d";
 
 const CONTRACT_ABI = [
     "function startStudy(uint256 amount, uint256 duration) external",
@@ -10,8 +10,12 @@ const CONTRACT_ABI = [
     "function balanceOf(address account) external view returns (uint256)",
     "function decimals() external view returns (uint8)",
     "function approve(address spender, uint256 value) external returns (bool)",
-    "function sessions(address account) external view returns (uint256 amount, uint256 startTime, uint256 duration, bool isActive)",
-    "function giveUp() external"
+    "function sessions(address account) external view returns (uint256 amount, uint256 startTime, uint256 duration, uint8 status)",
+    "function giveUp() external",
+    "function createGroup(string code) external",
+    "function joinGroup(string code) external",
+    "function getGroupMembers(string code) external view returns (address[])",
+    "function userToGroup(address user) external view returns (string)"
 ];
 
 // 전역 상태
@@ -20,6 +24,8 @@ let signer;
 let contract;
 let userAddress;
 let timerInterval;
+let groupPollingInterval;
+let myGroupCode = "";
 
 // DOM 요소
 const connectBtn = document.getElementById('connectBtn');
@@ -28,6 +34,11 @@ const studySection = document.getElementById('studySection');
 const walletAddressEl = document.getElementById('walletAddress');
 const walletBalanceEl = document.getElementById('walletBalance');
 const mintTestBtn = document.getElementById('mintTestBtn');
+
+const groupSelectionArea = document.getElementById('groupSelectionArea');
+const groupCodeIn = document.getElementById('groupCode');
+const joinGroupBtn = document.getElementById('joinGroupBtn');
+const createGroupBtn = document.getElementById('createGroupBtn');
 
 const setupArea = document.getElementById('setupArea');
 const timerArea = document.getElementById('timerArea');
@@ -40,6 +51,9 @@ const progressFill = document.getElementById('progressFill');
 const timerStatus = document.getElementById('timerStatus');
 const claimBtn = document.getElementById('claimBtn');
 const giveUpBtn = document.getElementById('giveUpBtn');
+
+const currentGroupCodeEl = document.getElementById('currentGroupCode');
+const groupMembersBody = document.getElementById('groupMembersBody');
 
 const loadingOverlay = document.getElementById('loadingOverlay');
 const loadingText = document.getElementById('loadingText');
@@ -57,6 +71,7 @@ function hideLoading() {
 }
 
 function formatAddress(addr) {
+    if (!addr) return '';
     return addr.slice(0, 6) + '...' + addr.slice(-4);
 }
 
@@ -79,12 +94,9 @@ connectBtn.addEventListener('click', async () => {
 
     try {
         showLoading("지갑 연결 중...");
-
-        // Ethers v6 문법
         provider = new ethers.BrowserProvider(window.ethereum);
         signer = await provider.getSigner();
         userAddress = await signer.getAddress();
-
         contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
         walletAddressEl.innerText = formatAddress(userAddress);
@@ -92,8 +104,6 @@ connectBtn.addEventListener('click', async () => {
         connectBtn.disabled = true;
 
         dashboard.classList.remove('hidden');
-        studySection.classList.remove('hidden');
-
         await updateBalance();
         await checkExistingSession();
 
@@ -112,31 +122,132 @@ async function updateBalance() {
         const decimals = await contract.decimals();
         const bal = await contract.balanceOf(userAddress);
         const formatted = ethers.formatUnits(bal, decimals);
-        // 소수점 2자리까지만 표시
         walletBalanceEl.innerText = parseFloat(formatted).toFixed(2) + " E2S";
     } catch (e) {
         console.error("잔액 조회 실패:", e);
     }
 }
 
-// 기존 진행중인 세션 확인
+// 2. 그룹 상태 및 진행중인 세션 확인
 async function checkExistingSession() {
     try {
-        const session = await contract.sessions(userAddress);
-        if (session.isActive) {
-            setupArea.classList.add('hidden');
-            timerArea.classList.remove('hidden');
+        myGroupCode = await contract.userToGroup(userAddress);
 
-            const startTime = Number(session.startTime);
-            const duration = Number(session.duration);
-            startTimerCountdown(startTime, duration);
+        if (!myGroupCode || myGroupCode === "") {
+            // 그룹이 없음
+            groupSelectionArea.classList.remove('hidden');
+            studySection.classList.add('hidden');
+        } else {
+            // 그룹이 있음
+            groupSelectionArea.classList.add('hidden');
+            studySection.classList.remove('hidden');
+            currentGroupCodeEl.innerText = `(코드: ${myGroupCode})`;
+
+            startGroupPolling();
+
+            const session = await contract.sessions(userAddress);
+            const statusInt = Number(session.status); // 0:None, 1:Active, 2:Success, 3:Failed
+            if (statusInt === 1) {
+                setupArea.classList.add('hidden');
+                timerArea.classList.remove('hidden');
+
+                const startTime = Number(session.startTime);
+                const duration = Number(session.duration);
+                startTimerCountdown(startTime, duration);
+            } else {
+                setupArea.classList.remove('hidden');
+                timerArea.classList.add('hidden');
+            }
         }
     } catch (e) {
-        console.error("세션 조회 실패:", e);
+        console.error("조회 실패:", e);
     }
 }
 
-// 2. 테스트 토큰 받기
+// 그룹 멤버 현황 폴링
+function startGroupPolling() {
+    if (groupPollingInterval) clearInterval(groupPollingInterval);
+    updateGroupMembers();
+    groupPollingInterval = setInterval(updateGroupMembers, 10000); // 10초마다 갱신
+}
+
+async function updateGroupMembers() {
+    if (!myGroupCode) return;
+    try {
+        const members = await contract.getGroupMembers(myGroupCode);
+        const decimals = await contract.decimals();
+        let html = '';
+
+        for (let m of members) {
+            const session = await contract.sessions(m);
+            const amount = ethers.formatUnits(session.amount, decimals);
+            const duration = Number(session.duration);
+            const statusInt = Number(session.status);
+
+            let statusText = '-';
+            let statusColor = 'inherit';
+            if (statusInt === 1) { statusText = '진행중 ⏳'; statusColor = '#f39c12'; }
+            else if (statusInt === 2) { statusText = '성공 🎉'; statusColor = '#2ecc71'; }
+            else if (statusInt === 3) { statusText = '실패(몰수) 💀'; statusColor = '#e74c3c'; }
+
+            const isMe = m.toLowerCase() === userAddress.toLowerCase() ? ' (나)' : '';
+
+            html += `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding: 10px 0;">${formatAddress(m)}${isMe}</td>
+                    <td style="padding: 10px 0;">${amount > 0 ? amount : '-'}</td>
+                    <td style="padding: 10px 0;">${duration > 0 ? duration + '초' : '-'}</td>
+                    <td style="padding: 10px 0; color: ${statusColor}; font-weight: bold;">${statusText}</td>
+                </tr>
+            `;
+        }
+
+        if (members.length === 0) {
+            html = `<tr><td colspan="4" style="text-align:center; padding:10px;">멤버가 없습니다.</td></tr>`;
+        }
+
+        groupMembersBody.innerHTML = html;
+    } catch (e) {
+        console.error("멤버 조회 실패", e);
+    }
+}
+
+// 3. 그룹 생성 / 참여
+createGroupBtn.addEventListener('click', async () => {
+    const code = groupCodeIn.value.trim();
+    if (!code) return Swal.fire('알림', '방 코드를 입력하세요.', 'warning');
+    try {
+        showLoading("방 생성 중...");
+        const tx = await contract.createGroup(code);
+        await tx.wait();
+        await checkExistingSession();
+        Swal.fire('성공', '방이 생성되었습니다!', 'success');
+    } catch (e) {
+        console.error(e);
+        Swal.fire('실패', '이미 존재하는 방이거나 에러가 발생했습니다.', 'error');
+    } finally {
+        hideLoading();
+    }
+});
+
+joinGroupBtn.addEventListener('click', async () => {
+    const code = groupCodeIn.value.trim();
+    if (!code) return Swal.fire('알림', '방 코드를 입력하세요.', 'warning');
+    try {
+        showLoading("방 참가 중...");
+        const tx = await contract.joinGroup(code);
+        await tx.wait();
+        await checkExistingSession();
+        Swal.fire('성공', '방에 입장했습니다!', 'success');
+    } catch (e) {
+        console.error(e);
+        Swal.fire('실패', '존재하지 않는 방이거나 에러가 발생했습니다.', 'error');
+    } finally {
+        hideLoading();
+    }
+});
+
+// 4. 테스트 토큰 받기
 mintTestBtn.addEventListener('click', async () => {
     try {
         showLoading("테스트 토큰 민팅 중...");
@@ -152,7 +263,7 @@ mintTestBtn.addEventListener('click', async () => {
     }
 });
 
-// 3. 공부 시작 (예치)
+// 5. 공부 시작 (예치)
 startStudyBtn.addEventListener('click', async () => {
     const amountStr = depositAmountIn.value;
     const durationStr = studyDurationIn.value;
@@ -162,17 +273,11 @@ startStudyBtn.addEventListener('click', async () => {
         return;
     }
 
-    if (CONTRACT_ADDRESS === "0x0000000000000000000000000000000000000000") {
-        Swal.fire('컨트랙트 주소 누락', 'app.js에서 CONTRACT_ADDRESS를 변경하세요.', 'error');
-        return;
-    }
-
     try {
         showLoading("1/2: 토큰 사용 승인 중...");
         const decimals = await contract.decimals();
         const amountWei = ethers.parseUnits(amountStr, decimals);
 
-        // Approve (컨트랙트 내부 구현 구조상, 자신에게 allowance를 부여해야 합니다)
         const approveTx = await contract.approve(userAddress, amountWei);
         await approveTx.wait();
 
@@ -181,14 +286,7 @@ startStudyBtn.addEventListener('click', async () => {
         await startTx.wait();
 
         await updateBalance();
-
-        // UI 변경
-        setupArea.classList.add('hidden');
-        timerArea.classList.remove('hidden');
-
-        // 타이머 시작 (현재 시간 기준)
-        const block = await provider.getBlock('latest');
-        startTimerCountdown(block.timestamp, Number(durationStr));
+        await checkExistingSession(); // 폴링 및 UI 갱신
 
         Swal.fire('예치 완료', '목표를 향해 달려보세요!', 'success');
 
@@ -200,7 +298,7 @@ startStudyBtn.addEventListener('click', async () => {
     }
 });
 
-// 4. 타이머 카운트다운 로직
+// 6. 타이머 카운트다운 로직
 function startTimerCountdown(startTime, duration) {
     if (timerInterval) clearInterval(timerInterval);
 
@@ -235,7 +333,7 @@ function startTimerCountdown(startTime, duration) {
     timerInterval = setInterval(updateTimer, 1000);
 }
 
-// 5. 보상 수령 (Claim)
+// 7. 보상 수령 (Claim)
 claimBtn.addEventListener('click', async () => {
     try {
         showLoading("보상 수령 트랜잭션 전송 중...");
@@ -247,7 +345,6 @@ claimBtn.addEventListener('click', async () => {
         setupArea.classList.remove('hidden');
         timerArea.classList.add('hidden');
 
-        // 초기화
         depositAmountIn.value = '';
         studyDurationIn.value = '';
 
@@ -257,6 +354,8 @@ claimBtn.addEventListener('click', async () => {
             icon: 'success',
             confirmButtonText: '확인'
         });
+
+        updateGroupMembers(); // 멤버 상태 즉시 갱신
 
     } catch (e) {
         console.error(e);
@@ -272,7 +371,7 @@ claimBtn.addEventListener('click', async () => {
     }
 });
 
-// 6. 공부 포기 (Give Up)
+// 8. 공부 포기 (Give Up)
 giveUpBtn.addEventListener('click', async () => {
     try {
         const result = await Swal.fire({
@@ -300,6 +399,8 @@ giveUpBtn.addEventListener('click', async () => {
             studyDurationIn.value = '';
 
             Swal.fire('포기 완료', '예치금이 몰수되었습니다. 다음에는 꼭 성공하세요!', 'error');
+
+            updateGroupMembers(); // 멤버 상태 즉시 갱신
         }
     } catch (e) {
         console.error(e);
