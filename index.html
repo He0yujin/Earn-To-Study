@@ -69,7 +69,10 @@
                         <div class="progress-fill" id="progressFill"></div>
                     </div>
                     <p class="status-text" id="timerStatus">열심히 공부하는 중...</p>
-                    <button id="claimBtn" class="btn action-btn success-btn hidden">인증 완료 및 보상 수령</button>
+                    <div class="action-buttons" style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button id="claimBtn" class="btn action-btn success-btn hidden" style="flex: 1;">인증 완료 및 보상 수령</button>
+                        <button id="giveUpBtn" class="btn action-btn danger-btn hidden" style="flex: 1; background-color: var(--error-color);">공부 포기하기 (예치금 몰수)</button>
+                    </div>
                 </div>
             </div>
 
