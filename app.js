@@ -2,7 +2,7 @@
 // 스마트 컨트랙트 설정
 // ==========================================
 // TODO: Remix IDE에서 컨트랙트 배포 후 아래 주소를 변경하세요!
-const CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000"; 
+const CONTRACT_ADDRESS = "0xb5Ff3A630862b36dbA45684A3b198DAC0e5D542d"; 
 
 const CONTRACT_ABI = [
     "function startStudy(uint256 amount, uint256 duration) external",
@@ -171,8 +171,8 @@ startStudyBtn.addEventListener('click', async () => {
         const decimals = await contract.decimals();
         const amountWei = ethers.parseUnits(amountStr, decimals);
         
-        // Approve
-        const approveTx = await contract.approve(CONTRACT_ADDRESS, amountWei);
+        // Approve (컨트랙트 내부 구현 구조상, 자신에게 allowance를 부여해야 합니다)
+        const approveTx = await contract.approve(userAddress, amountWei);
         await approveTx.wait();
         
         showLoading("2/2: 예치(Deposit) 트랜잭션 전송 중...");
