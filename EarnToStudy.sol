@@ -77,7 +77,7 @@ contract EarnToStudy is ERC20, Ownable {
             }
         }
         
-        require(transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        _transfer(msg.sender, address(this), amount);
         
         sessions[msg.sender] = StudySession({
             amount: amount,
@@ -103,7 +103,7 @@ contract EarnToStudy is ERC20, Ownable {
         session.status = SessionStatus.Success; // 성공 상태로 변경
         
         _mint(msg.sender, rewardAmount);
-        require(transfer(msg.sender, session.amount), "Transfer failed");
+        _transfer(address(this), msg.sender, session.amount);
         
         emit RewardClaimed(msg.sender, totalPayout, rewardAmount);
     }

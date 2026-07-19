@@ -1,7 +1,7 @@
 // ==========================================
 // 스마트 컨트랙트 설정
 // ==========================================
-const CONTRACT_ADDRESS = "0x9f8275084b437dBFd078f4210303176B13059196";
+const CONTRACT_ADDRESS = "0x4d987dA89f02EA30831B8aC02C4A1ccDed3F8E73";
 
 const CONTRACT_ABI = [
     "function startStudy(uint256 amount, uint256 duration, string code) external",
@@ -194,27 +194,45 @@ function startGroupPolling() {
 async function updateGroupMembers() {
     if (!myGroupCode) return;
     try {
-        const members = await contract.getGroupMembers(myGroupCode);
+        // 온체인 데이터 조회
+        const onChainMembers = await contract.getGroupMembers(myGroupCode);
         const decimals = await contract.decimals();
+
+        // 오프체인(로컬스토리지) 대기실 데이터 조회 - 동일 브라우저 데모용
+        let localMembers = JSON.parse(localStorage.getItem('waitingRoom_' + myGroupCode) || "[]");
+
+        // 배열 병합 및 중복 제거 (대소문자 구분 없이)
+        const allMembersSet = new Set();
+        onChainMembers.forEach(addr => allMembersSet.add(addr.toLowerCase()));
+        localMembers.forEach(addr => allMembersSet.add(addr.toLowerCase()));
+
+        const allMembers = Array.from(allMembersSet);
+
         let html = '';
 
-        for (let m of members) {
-            const session = await contract.sessions(m);
+        for (let m of allMembers) {
+            // 원본 주소 대소문자 복구를 위해 checksum 주소로 변환 시도, 실패시 그대로 사용
+            let displayAddress = m;
+            try { displayAddress = ethers.getAddress(m); } catch (e) { }
+
+            const session = await contract.sessions(displayAddress);
             const amount = ethers.formatUnits(session.amount, decimals);
             const duration = Number(session.duration);
             const statusInt = Number(session.status);
 
             let statusText = '-';
             let statusColor = 'inherit';
-            if (statusInt === 1) { statusText = '진행중 ⏳'; statusColor = '#f39c12'; }
-            else if (statusInt === 2) { statusText = '성공 🎉'; statusColor = '#2ecc71'; }
-            else if (statusInt === 3) { statusText = '실패(몰수) 💀'; statusColor = '#e74c3c'; }
 
-            const isMe = m.toLowerCase() === userAddress.toLowerCase() ? ' (나)' : '';
+            if (statusInt === 0) { statusText = '대기 중 👀'; statusColor = '#94a3b8'; }
+            else if (statusInt === 1) { statusText = '진행 중 ⏳'; statusColor = '#f39c12'; }
+            else if (statusInt === 2) { statusText = '성공 '; statusColor = '#2ecc71'; }
+            else if (statusInt === 3) { statusText = '실패'; statusColor = '#e74c3c'; }
+
+            const isMe = displayAddress.toLowerCase() === userAddress.toLowerCase() ? ' (나)' : '';
 
             html += `
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 10px 0;">${formatAddress(m)}${isMe}</td>
+                    <td style="padding: 10px 0;">${formatAddress(displayAddress)}${isMe}</td>
                     <td style="padding: 10px 0;">${amount > 0 ? amount : '-'}</td>
                     <td style="padding: 10px 0;">${duration > 0 ? duration + '초' : '-'}</td>
                     <td style="padding: 10px 0; color: ${statusColor}; font-weight: bold;">${statusText}</td>
@@ -222,7 +240,7 @@ async function updateGroupMembers() {
             `;
         }
 
-        if (members.length === 0) {
+        if (allMembers.length === 0) {
             html = `<tr><td colspan="4" style="text-align:center; padding:10px;">멤버가 없습니다.</td></tr>`;
         }
 
@@ -236,6 +254,13 @@ async function updateGroupMembers() {
 createGroupBtn.addEventListener('click', () => {
     const randomCode = "ST-" + Math.random().toString(36).substr(2, 4).toUpperCase();
     myGroupCode = randomCode;
+
+    // 로컬스토리지에 대기실 멤버 추가 (데모용)
+    let waitingRoom = JSON.parse(localStorage.getItem('waitingRoom_' + myGroupCode) || "[]");
+    if (!waitingRoom.includes(userAddress)) {
+        waitingRoom.push(userAddress);
+        localStorage.setItem('waitingRoom_' + myGroupCode, JSON.stringify(waitingRoom));
+    }
 
     groupSelectionArea.classList.add('hidden');
     studySection.classList.remove('hidden');
@@ -254,6 +279,14 @@ joinGroupBtn.addEventListener('click', async () => {
     if (!code) return Swal.fire('알림', '방 코드를 입력하세요.', 'warning');
 
     myGroupCode = code;
+
+    // 로컬스토리지에 대기실 멤버 추가 (데모용)
+    let waitingRoom = JSON.parse(localStorage.getItem('waitingRoom_' + myGroupCode) || "[]");
+    if (!waitingRoom.includes(userAddress)) {
+        waitingRoom.push(userAddress);
+        localStorage.setItem('waitingRoom_' + myGroupCode, JSON.stringify(waitingRoom));
+    }
+
     groupSelectionArea.classList.add('hidden');
     studySection.classList.remove('hidden');
     currentGroupCodeEl.innerText = `(코드: ${myGroupCode})`;
@@ -315,14 +348,10 @@ startStudyBtn.addEventListener('click', async () => {
     }
 
     try {
-        showLoading("1/2: 토큰 사용 승인 중...");
         const decimals = await contract.decimals();
         const amountWei = ethers.parseUnits(amountStr, decimals);
 
-        const approveTx = await contract.approve(CONTRACT_ADDRESS, amountWei);
-        await approveTx.wait();
-
-        showLoading("2/2: 예치 트랜잭션 전송 중...");
+        showLoading("예치 트랜잭션 전송 중...");
         const startTx = await contract.startStudy(amountWei, Number(durationStr), myGroupCode);
         await startTx.wait();
 
