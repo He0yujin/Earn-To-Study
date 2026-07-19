@@ -29,7 +29,10 @@
                 <h1>📚 Earn To Study</h1>
                 <p>목표를 달성하고 보상을 받으세요 (E2S)</p>
             </div>
-            <button id="connectBtn" class="btn primary-btn">지갑 연결</button>
+            <div style="display: flex; gap: 10px;">
+                <button id="logoutBtn" class="btn secondary-btn hidden">로그아웃</button>
+                <button id="connectBtn" class="btn primary-btn">지갑 연결</button>
+            </div>
         </header>
 
         <main>
@@ -59,6 +62,9 @@
             </div>
 
             <div id="studySection" class="study-section hidden">
+                <div style="margin-bottom: 20px;">
+                    <button id="backBtn" class="btn secondary-btn small-btn">← 방 선택으로 돌아가기</button>
+                </div>
                 <div class="setup-area" id="setupArea">
                     <h2>오늘의 목표 설정</h2>
                     <div class="input-group">

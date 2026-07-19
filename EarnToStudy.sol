@@ -45,39 +45,6 @@ contract EarnToStudy is ERC20, Ownable {
         _mint(msg.sender, 1000000 * 10 ** decimals());
     }
     
-    // ==========================================
-    // [핵심 기능 0] 스터디 그룹 생성 및 입장
-    // ==========================================
-    
-    /**
-     * @dev 새로운 스터디 방을 만듭니다.
-     */
-    function createGroup(string calldata code) external {
-        require(bytes(code).length > 0, "Code cannot be empty");
-        require(groups[code].members.length == 0, "Group already exists");
-        require(bytes(userToGroup[msg.sender]).length == 0, "Already in a group");
-        
-        groups[code].code = code;
-        groups[code].members.push(msg.sender);
-        userToGroup[msg.sender] = code;
-        
-        emit GroupCreated(code, msg.sender);
-    }
-    
-    /**
-     * @dev 기존에 만들어진 방에 들어갑니다.
-     */
-    function joinGroup(string calldata code) external {
-        require(bytes(code).length > 0, "Code cannot be empty");
-        require(groups[code].members.length > 0, "Group does not exist");
-        require(bytes(userToGroup[msg.sender]).length == 0, "Already in a group");
-        
-        groups[code].members.push(msg.sender);
-        userToGroup[msg.sender] = code;
-        
-        emit GroupJoined(code, msg.sender);
-    }
-    
     /**
      * @dev 특정 방의 참여자 지갑 주소 목록을 가져옵니다. (프론트엔드 현황판 렌더링용)
      */
@@ -88,11 +55,27 @@ contract EarnToStudy is ERC20, Ownable {
     // ==========================================
     // [핵심 기능 1] 공부 시작 (예치)
     // ==========================================
-    function startStudy(uint256 amount, uint256 duration) external {
-        require(bytes(userToGroup[msg.sender]).length > 0, "Must join a group first");
+    function startStudy(uint256 amount, uint256 duration, string calldata code) external {
+        require(bytes(code).length > 0, "Group code cannot be empty");
         require(amount > 0, "Amount must be greater than 0");
         require(duration > 0, "Duration must be greater than 0");
         require(sessions[msg.sender].status != SessionStatus.Active, "Already studying");
+        
+        // 방 참가 로직 (트랜잭션 최소화를 위해 예치 시점에 한 번에 처리)
+        if (keccak256(bytes(userToGroup[msg.sender])) != keccak256(bytes(code))) {
+            userToGroup[msg.sender] = code;
+            
+            bool isMember = false;
+            for(uint i=0; i<groups[code].members.length; i++) {
+                if(groups[code].members[i] == msg.sender) {
+                    isMember = true;
+                    break;
+                }
+            }
+            if(!isMember) {
+                groups[code].members.push(msg.sender);
+            }
+        }
         
         require(transferFrom(msg.sender, address(this), amount), "Transfer failed");
         
