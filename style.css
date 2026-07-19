@@ -21,11 +21,10 @@ body {
     background-color: var(--bg-dark);
     color: var(--text-main);
     min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     position: relative;
+    padding: 20px;
 }
 
 /* Dynamic Animated Background Blobs */
@@ -81,6 +80,7 @@ body {
     max-width: 600px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     z-index: 1;
+    margin: 40px auto;
 }
 
 header {
